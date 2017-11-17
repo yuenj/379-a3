@@ -25,6 +25,7 @@
 #include <time.h>
 #include <unistd.h>
 
+
 #define MAXBUF 200             // max buffer size for messages
 #define MAXLINE 4096           // max line length errors
 #define CPU_LIMIT 600          // lifespan of the chat program: 600 seconds
@@ -134,7 +135,7 @@ int main(int argc, char *argv[])
       // if client is in a connected state, check for commands from the server
       if (N > 1 && pfd[1].revents & POLLIN) { 
         memset(buf, 0, sizeof buf);
-        if (recv(s, buf, sizeof buf, 0) < 0) {
+        if (read(s, buf, sizeof buf) < 0) {
           err_sys("%s: failed to read", argv[0]);
         }
         // handle server commands
