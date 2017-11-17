@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
               if (errno == EISCONN) {
                 printf("You already have a chat session going on.\n");
               } else if (errno == ECONNREFUSED) {
-                printf("The server is not running or has reached the client limit.\n");
+                printf("The server is not running.\n");
               } else {
                 err_sys("%s: failed to connect", argv[0]);
               }
@@ -312,8 +312,8 @@ int main(int argc, char *argv[])
       err_sys("%s: failed to bind socket", argv[0]);
     }
     
-    // indicate how many connection requests can be queued
-    if (listen(s, nclient) < 0) {
+    // prepare to listen to incoming connections
+    if (listen(s, SOMAXCONN) < 0) {
       err_sys("%s: failed to listen", argv[0]);
     }
     
@@ -413,26 +413,34 @@ int main(int argc, char *argv[])
         err_sys("%s: poll error", argv[0]);
       }
       // handle a new connection request from the listening socket
-      if ((N <= nclient) && (pfd[0].revents & POLLIN)) {
+      if (pfd[0].revents & POLLIN) {
         // accept a new connection
         struct sockaddr_in from;
         memset((char *) &from, 0, sizeof from);
         unsigned int fromlen = sizeof((struct sockaddr *) &from);
         newsock[N] = accept(s, (struct sockaddr *)&from, &fromlen);
         
-        // we may also want to perform STREAM I/O
-        if ((sfpin[N] = fdopen(newsock[N], "r")) < 0) {
-          err_sys("%s: failed converting socket to FILE *", argv[0]);
+        if (N <= nclient) {
+          // we may also want to perform STREAM I/O
+          if ((sfpin[N] = fdopen(newsock[N], "r")) < 0) {
+            err_sys("%s: failed converting socket to FILE *", argv[0]);
+          }
+          // prepare for nonblocking I/O polling from the new socket
+          pfd[N].fd = newsock[N];
+          pfd[N].events = POLLIN;
+          pfd[N].revents = 0;
+          ++N;
+        } else {
+          // the client limit has been reached
+          // let client know that a chat session cannot begin
+          memset(buf, 0, sizeof buf);
+          strcpy(buf, "[server] Error: the client limit has been reached\n");
+          if (send(newsock[i], buf, strlen(buf), 0) < 0) {
+            err_sys("%s: failed to send", argv[0]);
+          }
+          // close the socket
+          close(newsock[i]);
         }
-        
-        // start the keepalive timer
-        time(&keepalive[N]);
-
-        // prepare for nonblocking I/O polling from the new socket
-        pfd[N].fd = newsock[N];
-        pfd[N].events = POLLIN;
-        pfd[N].revents = 0;
-        ++N;
       } 
       // check connected client sockets for commands
       for (i = 1; i < N; ++i) {
@@ -444,9 +452,6 @@ int main(int argc, char *argv[])
             //===========================================
             if (strstr(buf, "open ") != NULL) {
               // client has requested to open a TCP connection
-
-              // update the time of the last command from the client
-              time(&lastcmd[i]);
 
               // extract username
               strtok(buf, " ");                     // get the second word
@@ -476,6 +481,11 @@ int main(int argc, char *argv[])
                 // save the username
                 usernames[i] = (char *) malloc(strlen(username) * sizeof(char));
                 strcpy(usernames[i], username);
+
+                // start the keepalive timer
+                time(&keepalive[N]);
+                // update the time of the last command from the client
+                time(&lastcmd[i]);
 
                 // send the server response
                 memset(buf, 0, sizeof buf);
