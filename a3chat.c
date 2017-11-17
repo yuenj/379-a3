@@ -369,6 +369,7 @@ int main(int argc, char *argv[])
             }
             for (int j = i; j < N-1; ++j) {
               newsock[j] = newsock[j+1];
+              sfpin[j] = sfpin[j+1];
               usernames[j] = usernames[j+1];
               keepalive[j] = keepalive[j+1];
               lastcmd[j] = lastcmd[j+1];
@@ -450,7 +451,13 @@ int main(int argc, char *argv[])
           if (fgets(buf, MAXBUF, sfpin[i]) != NULL) {
 
             //===========================================
-            if (strstr(buf, "open ") != NULL) {
+            if (strchr(buf, KAL_char) != NULL) {
+              // process periodic keepalive messages from the client
+              time(&keepalive[i]);
+            }
+
+            //===========================================
+            else if (strstr(buf, "open ") != NULL) {
               // client has requested to open a TCP connection
 
               // extract username
@@ -640,6 +647,7 @@ int main(int argc, char *argv[])
               }
               for (int j = i; j < N-1; ++j) {
                 newsock[j] = newsock[j+1];
+                sfpin[j] = sfpin[j+1];
                 usernames[j] = usernames[j+1];
                 keepalive[j] = keepalive[j+1];
                 lastcmd[j] = lastcmd[j+1];
@@ -678,6 +686,7 @@ int main(int argc, char *argv[])
               }
               for (int j = i; j < N-1; ++j) {
                 newsock[j] = newsock[j+1];
+                sfpin[j] = sfpin[j+1];
                 usernames[j] = usernames[j+1];
                 keepalive[j] = keepalive[j+1];
                 lastcmd[j] = lastcmd[j+1];
@@ -695,12 +704,6 @@ int main(int argc, char *argv[])
                 recipients[j][N-1] = 0;
               }
               --N;
-            }
-            
-            //===========================================
-            else if (strchr(buf, KAL_char) != NULL) {
-              // process periodic keepalive messages from the client
-              time(&keepalive[i]);
             }
           }
         }
