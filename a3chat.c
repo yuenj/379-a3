@@ -342,18 +342,22 @@ int main(int argc, char *argv[])
         printf("activity report:\n");
         
         for (i = 1; i < N; ++i) {
-          char *username = NULL;
-          int sockfd;
-          
+
+          char datetime[MAXBUF];
+          struct tm *tmp;
+
           // check for clients that have terminated unexpectedly
           if ((keepalive[i] != 0) && (difftime(time(NULL), keepalive[i]) >= (KAL_interval * KAL_count))) {
+            // report the last time a keepalive message was detected
+            tmp = localtime(&keepalive[i]);
+            strftime(datetime, MAXBUF, "%c", tmp);
+            printf("'%s' [sockfd= %d]: loss of keepalive messages detected at %s, connection closed\n", usernames[i], newsock[i], datetime);
+            fflush(stdout);
+
             // free resources that have been allocated to the client
             fclose(sfpin[i]);
             close(newsock[i]);
-            
-            // save the username and sockfd for activity report
-            username = usernames[i];
-            sockfd = newsock[i];
+            free(usernames[i]);
 
             // shift container elements one to the left since we are decrementing N
             for (int j = 1; j < N; ++j) {
@@ -382,25 +386,13 @@ int main(int argc, char *argv[])
               recipients[j][N-1] = 0;
             }
             --N;
-          }
-          
-          char datetime[MAXBUF];
-          struct tm *tmp;
-          if (username == NULL) {
+          } else {
             // if the client is logged in, 
             // display the last time that they sent a command to the server
             tmp = localtime(&lastcmd[i]);
             strftime(datetime, MAXBUF, "%c", tmp);
             printf("'%s' [sockfd= %d]:%s\n", usernames[i], newsock[i], datetime);
             fflush(stdout);
-          } else {
-            // otherwise, the client is disconnected, 
-            // report the last time a keepalive message was detected
-            tmp = localtime(&keepalive[i]);
-            strftime(datetime, MAXBUF, "%c", tmp);
-            printf("'%s' [sockfd= %d]: loss of keepalive messages detected at %s, connection closed\n", username, sockfd, datetime);
-            fflush(stdout);
-            free(username);
           }
         }
       }
