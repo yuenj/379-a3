@@ -387,6 +387,7 @@ int main(int argc, char *argv[])
               recipients[j][N-1] = 0;
             }
             --N;
+            --i; // check the next recipient since we shifted elements to the left
           } else {
             // if the client is logged in, 
             // display the last time that they sent a command to the server
