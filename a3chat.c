@@ -327,9 +327,7 @@ int main(int argc, char *argv[])
     int N = 1; // initially just one descriptor to poll
     
     // set timer for activity reporting and monitoring of terminated clients
-    struct sigaction act;
-    act.sa_handler = keep_alive;
-    if (sigaction(SIGALRM, &act, 0) < 0) {
+    if (signal(SIGALRM, keep_alive) < 0) {
       err_sys("%s: failed to signal", argv[0]);
     }
     alarm(15); // check every 15 seconds
@@ -401,7 +399,11 @@ int main(int argc, char *argv[])
       }
       // check stdin for commands
       if ((rval = poll(pstdin, 1, timeout)) < 0) {
-        err_sys("%s: poll error", argv[0]);
+        if (errno == EINTR) { // do nothing if a signal occurs
+          continue;
+        } else {
+          err_sys("%s: poll error", argv[0]);
+        }
       }
       // handle the exit command to shut down the server
       if (pstdin[0].revents & POLLIN) {
@@ -413,7 +415,11 @@ int main(int argc, char *argv[])
       }
       // check sockets for commands
       if ((rval = poll(pfd, N, timeout)) < 0) {
-        err_sys("%s: poll error", argv[0]);
+        if (errno == EINTR) { // do nothing if a signal occurs
+          continue;
+        } else {
+          err_sys("%s: poll error", argv[0]);
+        }
       }
       // handle a new connection request from the listening socket
       if (pfd[0].revents & POLLIN) {
