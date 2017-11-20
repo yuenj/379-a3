@@ -3,7 +3,7 @@
  * CMPUT 379 Assignment 3: Chat program with sockets *
  * Acknowledgements: APUE book, lecture notes,       *
  *   stack overflow                                  *
- * Date: November 16, 2017                           *
+ * Date: November 20, 2017                           *
  * Professor: Ehab Elmallah                          *
  *****************************************************/
 
@@ -26,22 +26,22 @@
 #include <unistd.h>
 
 
-#define MAXBUF 200             // max buffer size for messages
-#define MAXLINE 4096           // max line length errors
-#define CPU_LIMIT 600          // lifespan of the chat program: 600 seconds
-#define KAL_char 0x6           // A non-printable character (e.g., ACK)
-#define KAL_length 5           // Number of KAL_char in one keepalive message
-#define KAL_interval 1.5       // Client sends a keepalive message every 1.5 seconds
-#define KAL_count 5            // Number of consecutive keepalive messages that needs
-                               // to be missed for the server to consider that the client
-                               // has terminated unexpectedly
+#define MAXBUF 200              // max buffer size for messages
+#define MAXLINE 4096            // max line length errors
+#define CPU_LIMIT 600           // lifespan of the chat program: 600 seconds
+#define KAL_char 0x6            // A non-printable character (e.g., ACK)
+#define KAL_length 5            // Number of KAL_char in one keepalive message
+#define KAL_interval 1.5        // Client sends a keepalive message every 1.5 seconds
+#define KAL_count 5             // Number of consecutive keepalive messages that needs
+                                // to be missed for the server to consider that the client
+                                // has terminated unexpectedly
 
 static void keep_alive(int signo);
 static void err_doit(int errnoflag, int error, const char *fmt, va_list ap);
 void err_quit(const char *fmt, ...);
 void err_sys(const char *fmt, ...);
 
-static jmp_buf return_pt;
+static int KEEP_ALIVE_FLAG = 0; // if flag is 1, generate activity report
 
 int main(int argc, char *argv[])
 {
@@ -327,7 +327,9 @@ int main(int argc, char *argv[])
     int N = 1; // initially just one descriptor to poll
     
     // set timer for activity reporting and monitoring of terminated clients
-    if (signal(SIGALRM, keep_alive) < 0) {
+    struct sigaction act;
+    act.sa_handler = keep_alive;
+    if (sigaction(SIGALRM, &act, 0) < 0) {
       err_sys("%s: failed to signal", argv[0]);
     }
     alarm(15); // check every 15 seconds
@@ -336,8 +338,8 @@ int main(int argc, char *argv[])
     while (1) {
 
       // generate a activity report of all logged in clients and their recorded times 
-      if (setjmp(return_pt) == 1) {
-        alarm(15); // reset the alarm
+      if (KEEP_ALIVE_FLAG == 1) {
+        KEEP_ALIVE_FLAG = 0;  // reset the flag
         
         printf("activity report:\n");
         
@@ -735,7 +737,8 @@ int main(int argc, char *argv[])
 // display activity reports and detect terminated clients.
 static void keep_alive(int signo)
 {
-  longjmp(return_pt, 1);
+  KEEP_ALIVE_FLAG = 1;
+  alarm(15); // reset the alarm
 }
 
 // ------------------------------
